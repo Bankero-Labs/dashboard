@@ -5,6 +5,7 @@ import { createAdminClient, createSessionClient } from "../appwrite";
 import { cookies } from "next/headers";
 import { encryptId, extractCustomerIdFromUrl, parseStringify } from "../utils";
 import { CountryCode, ProcessorTokenCreateRequest, ProcessorTokenCreateRequestProcessorEnum, Products } from "plaid";
+import { addProductConsent } from "@/lib/plaid";
 
 import { plaidClient } from '@/lib/plaid';
 import { revalidatePath } from "next/cache";
@@ -138,7 +139,7 @@ export const createLinkToken = async (user: User) => {
         client_user_id: user.$id
       },
       client_name: `${user.firstName} ${user.lastName}`,
-      products: ['auth'] as Products[],
+      products: ['auth', 'transactions'] as Products[],
       language: 'en',
       country_codes: ['US'] as CountryCode[],
     }
@@ -194,6 +195,17 @@ export const exchangePublicToken = async ({
 
     const accessToken = response.data.access_token;
     const itemId = response.data.item_id;
+
+    console.log("Access Token:", accessToken, "Item ID:", itemId);
+
+    // Add consent for transactions
+      await addProductConsent({
+          accessToken,
+          products: ['transactions'], // Add consent for transactions
+      });
+
+      console.log("Consent for transactions added successfully.");
+    
     
     // Get account information from Plaid using the access token
     const accountsResponse = await plaidClient.accountsGet({
@@ -201,6 +213,10 @@ export const exchangePublicToken = async ({
     });
 
     const accountData = accountsResponse.data.accounts[0];
+
+    console.log("Accounts retrieved successfully:", accountData);
+
+    
 
     // Create a processor token for Dwolla using the access token and account ID
     const request: ProcessorTokenCreateRequest = {
